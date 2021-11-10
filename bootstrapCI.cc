@@ -1,3 +1,4 @@
+//g++ -O3 -o bootstrapCI.o bootstrapCI.cc -fopenmp
 #include <vector>
 #include <string>
 #include <fstream>
@@ -6,6 +7,7 @@
 #include <random>
 #include <iterator>
 #include <cmath>
+#include "cxxopts.hpp"
 
 using namespace std;
 
@@ -74,16 +76,46 @@ void bootstrapCI(vector<double> &scores, int B, int CI){
     cout << "Bootstrapped mean: " << average(res) << "\n";
 }
 
-int main(int argc, char *argv[]){
-    if(argc <= 2){
-        cout << "Invalid usage ./bootstrapCI <scores> <B> <CI>\n";
-    }else{
-        string scoresFile = argv[1];
-        int B = atoi(argv[2]);
-        int CI = atoi(argv[3]);
-        vector<double> scores = readFile(scoresFile);
-        cout << "Starting test" << endl;
-        bootstrapCI(scores, B, CI);
+cxxopts::ParseResult options(int argc, char* argv[]) {
+    try{
+        cxxopts::Options options("bootstrapCI", "Tool to calculate Confidence Intervals employing bootstrapping");
+        options.add_options()("h,help", "Print this help")
+        ("f,file", "Path to the scores file",cxxopts::value<string>())
+        ("b", "Number of trials to calculate de CI",cxxopts::value<int>()->default_value("10000"))
+        ("c", "Desired confidence interval", cxxopts::value<int>()->default_value("95"));
+
+        cxxopts::ParseResult result = options.parse(argc, argv);
+
+        if(result.count("help") or result.arguments().size() == 0) {
+            cout << options.help({"", "Group"}) << "\n";
+            exit(0);
+        }
+
+        if(result["b"].as<int>() < 1) {
+            cout << "Number of repetitions must be larger than 0.\n";
+            exit(0);
+        }
+
+        if(result["c"].as<int>() < 1 || result["c"].as<int>() > 99) {
+            cout << "The Confidence Interval must be between 1 and 99.\n";
+            exit(0);
+        }
+
+        return result;
+
+    }catch (const cxxopts::OptionException& e) {
+        std::cout << "Error parsing options " << e.what() << "\n";
+        exit(1);
     }
+}
+
+int main(int argc, char *argv[]){
+    cxxopts::ParseResult result = options(argc, argv);
+    string scoresFile = result["f"].as<std::string>();
+    int B = result["b"].as<int>();
+    int CI = result["c"].as<int>();
+    vector<double> scores = readFile(scoresFile);
+    cout << "Starting test" << endl;
+    bootstrapCI(scores, B, CI);
     return 0;
 }
